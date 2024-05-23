@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="45b5facf-6c8c-4d9d-97a5-e0b19e425772" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<os:object-store name="lakshman" doc:name="Object store" doc:id="9c7651ac-2c27-4a53-a65a-f04736a586b9" />
+	<flow name="soap1Flow" doc:id="29416bb9-349b-43d8-83f7-5a20777c27b0" >
+		<http:listener doc:name="Listener" doc:id="d6a648d7-d705-4682-95d9-7e9be231d2ba" config-ref="HTTP_Listener_config" path="/batch"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="04269e69-0bbf-4713-a3e9-b56119759252" variableName="actual"/>
+		<os:retrieve doc:name="Retrieve" doc:id="37e4ce16-6bc3-44b1-bb86-eb5cf8895b92" key="b" objectStore="lakshman">
+			<os:default-value><![CDATA[noValue]]></os:default-value>
+		</os:retrieve>
+		<ee:transform doc:name="Transform Message" doc:id="135bf97a-f987-4072-a6d1-701309aa615f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[vars.actual]]></ee:set-payload>
+				<ee:set-attributes ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-attributes>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="store" ><![CDATA[payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="89ca50e9-20dc-43e3-9b47-85ed746b1b58" >
+			<when expression='#[vars.store == "noValue"]'>
+				<batch:job jobName="soap1Batch_Job" doc:id="68f7dd25-3dba-43aa-8f1f-cfc40b0fafb7" maxFailedRecords="10">
+			<batch:process-records>
+				<batch:step name="Batch_Step" doc:id="95f6f14d-80b1-4a84-90fa-3b46ee235054" acceptExpression="#[sizeOf(payload.phone as String) == 10]">
+					<logger level="INFO" doc:name="Logger" doc:id="60c76ea6-2c31-4cf1-a0c3-3ad6bc033926" message="pass records :::: #[payload]" />
+				</batch:step>
+				<batch:step name="Batch_Step1" doc:id="c1baffdd-2cbf-4e53-95e5-227f0bdd1b51" acceptPolicy="ALL" acceptExpression="#[sizeOf(payload.phone as String) != 10]">
+							<set-variable value="#[payload]" doc:name="Set Variable" doc:id="e38be964-9607-4259-8262-d6a3bb10ef65" variableName="second"/>
+							<os:retrieve doc:name="Retrieve" doc:id="8ed7373b-a9e7-4aab-a722-21450a73923e" key="b" objectStore="lakshman">
+								<os:default-value ><![CDATA[noValue]]></os:default-value>
+							</os:retrieve>
+							<ee:transform doc:name="Transform Message" doc:id="9cff85d4-05a1-4535-9ecf-863a26a70c81" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.second]]></ee:set-payload>
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable variableName="object" ><![CDATA[payload]]></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+							<choice doc:name="Choice" doc:id="386c9dee-4560-4b76-a897-2f9a7c9da866" >
+								<when expression='#[vars.object == "noValue"]'>
+									<ee:transform doc:name="Transform Message" doc:id="57a20bde-ee8a-41fd-95ea-3468b29557ee">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+									<ee:transform doc:name="Transform Message" doc:id="27a500c2-061a-4c17-8600-b2e95c2d13b2">
+									<ee:message>
+										<ee:set-payload><![CDATA[%dw 2.0
+output application/csv
+---
+payload]]></ee:set-payload>
+									</ee:message>
+								</ee:transform>
+									<file:write doc:name="Write" doc:id="41c2982a-9ea6-4a93-a424-0946c6ff4731" path='#["E:\\pdf\\" ++ "b.csv"]' mode="APPEND">
+					</file:write>
+									<os:store doc:name="Store" doc:id="ab04bde5-fc3a-4fd8-abc8-2bfb2fca488e" key="b" objectStore="lakshman">
+						<os:value><![CDATA[#["alreadyThere"]]]></os:value>
+					</os:store>
+								</when>
+								<otherwise >
+									<ee:transform doc:name="Transform Message" doc:id="4131967b-f9c3-4714-933a-61b42b52203b" >
+										<ee:message >
+											<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+										</ee:message>
+									</ee:transform>
+									<ee:transform doc:name="Transform Message" doc:id="e01227d6-ce13-4548-a105-03ba28b04c82" >
+										<ee:message >
+											<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header = false
+---
+payload]]></ee:set-payload>
+										</ee:message>
+									</ee:transform>
+									<file:write doc:name="Write" doc:id="2d8817a2-c9be-4da3-af82-47c0aaf8f560" path='#["E:\\pdf\\" ++ "b.csv"]' mode="APPEND"/>
+								</otherwise>
+							</choice>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+			</when>
+			<otherwise>
+				<batch:job jobName="soap1Batch_Job1" doc:id="fa8f27bd-f412-4eed-9c0b-8f4fc14a0691" maxFailedRecords="10">
+			<batch:process-records>
+				<batch:step name="Batch_Step2" doc:id="63a3a92c-e349-4ff9-9883-b1d2f5dcccf1" acceptExpression="#[sizeOf(payload.phone as String) == 10]">
+					<logger level="INFO" doc:name="Logger" doc:id="2d984356-6f09-49b6-a8f6-a4509af4eb7d" />
+				</batch:step>
+				<batch:step name="Batch_Step3" doc:id="a6f1b608-56b5-4865-8f71-b3019e37e9cf" acceptExpression="#[sizeOf(payload.phone as String) != 10]" acceptPolicy="ALL">
+					<ee:transform doc:name="Transform Message" doc:id="d993eea7-c1d7-44b5-b0b4-48256ec980a6" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+							<ee:transform doc:name="Transform Message" doc:id="3db981ff-9dba-4d20-9733-fcad6a360c19">
+									<ee:message>
+										<ee:set-payload><![CDATA[%dw 2.0
+output application/csv header = false
+---
+payload]]></ee:set-payload>
+									</ee:message>
+								</ee:transform>
+							<file:write doc:name="Write" doc:id="2074e21a-eedf-43fe-bdd2-f92b34b5e4de" path='#["E:\\pdf\\" ++ "b.csv"]' mode="APPEND">
+					</file:write>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="soap1Flow1" doc:id="6c5f26b8-30d7-4f24-afb1-dcfc2ca5103f" >
+		<http:listener doc:name="Listener" doc:id="ccf9c3a3-49e4-4136-ac13-36cb6c7839b1" config-ref="HTTP_Listener_config" path="/batch1"/>
+		<logger level="INFO" doc:name="Logger" doc:id="2f04909b-bb15-4f35-84ca-81f66156c957" />
+		<set-payload value='#[[1,2,3,4,"a","b","c","d"]]' doc:name="Set Payload" doc:id="01fe3e2f-d92b-4245-b0db-a741347a5534" />
+		<batch:job jobName="soap1Batch_Job2" doc:id="a8c3db17-60d9-498f-becd-697e89bb294a" maxFailedRecords="10">
+			<batch:process-records >
+				<batch:step name="Batch_Step2" doc:id="0c13d5a0-4f32-4155-a3e3-aecf869edd8a" >
+					<set-payload value="#[payload * 10]" doc:name="Set Payload" doc:id="9de1e609-d3b3-4f72-9b6a-44828830aa25" />
+					<logger level="INFO" doc:name="Logger" doc:id="c198d53d-7a68-4951-b08f-b1ea54b38fa0" message="pass records:::::: #[payload]"/>
+				</batch:step>
+				<batch:step name="Batch_Step3" doc:id="9af4d5bb-aece-45c8-b20d-3f7b13f661c1" acceptPolicy="ONLY_FAILURES">
+					<logger level="INFO" doc:name="Logger" doc:id="685b2967-4f12-43f9-8533-09c717398aa5" message="failrecords:::::: #[payload]"/>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+	</flow>
+</mule>
